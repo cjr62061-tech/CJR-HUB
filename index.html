@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Strict Chess Bot</title>
+<style>
+  body{background:#1a1a1a;color:white;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;padding:10px}
+  #board{display:grid;grid-template-columns:repeat(8, 60px);grid-template-rows:repeat(8, 60px);border:4px solid #fff;border-radius:8px}
+  .sq{width:60px;height:60px;display:flex;align-items:center;justify-content:center;font-size:40px;cursor:pointer;user-select:none}
+  .light{background:#f0d9b5} .dark{background:#b58863}
+  .selected{outline:4px solid yellow;outline-offset:-4px}
+  .hint{background:radial-gradient(circle, rgba(0,0,0,0.5) 25%, transparent 30%)}
+  .lastmove{background:#f6f669 !important}
+  #info{margin:15px;font-size:18px}
+  button{padding:10px 20px;font-size:16px;border-radius:8px;border:none;background:#4CAF50;color:white;cursor:pointer}
+</style>
+</head>
+<body>
+<h2>Strict Chess Bot - White tum ho</h2>
+<div id="info">Tumhari chal</div>
+<div id="board"></div>
+<br>
+<button onclick="resetGame()">New Game</button>
+<p style="opacity:0.6;font-size:13px">Bot Depth: 3 | Strict Rules: Legal moves only</p>
+
+<script>
+// ---- Minimal Chess Engine ----
+const PIECES = {'P':100,'N':320,'B':330,'R':500,'Q':900,'K':20000};
+let board, turn='w', selected=null, legalMoves=[], lastMove=[], gameOver=false;
+
+function initialBoard(){
+return [
+['r','n','b','q','k','b','n','r'],
+['p','p','p','p','p','p','p','p'],
+['','','','','','','',''],
+['','','','','','','',''],
+['','','','','','','',''],
+['','','','','','','',''],
+['P','P','P','P','P','P','P','P'],
+['R','N','B','Q','K','B','N','R']
+];
+}
+
+function isWhite(p){return p && p===p.toUpperCase()}
+function isBlack(p){return p && p===p.toLowerCase()}
+function inside(r,c){return r>=0 && r<8 && c>=0 && c<8}
+
+function getLegalMoves(r,c){
+  let p=board[r][c]; if(!p) return [];
+  let moves=[]; let white=isWhite(p); let dir=white?-1:1;
+  let lower=p.toLowerCase();
+  if(lower==='p'){
+    if(inside(r+dir,c) && !board[r+dir][c]){moves.push([r+dir,c]); if((white&&r==6||!white&&r==1) && !board[r+dir*2][c]) moves.push([r+dir*2,c])}
+    for(let dc of [-1,1]) if(inside(r+dir,c+dc) && board[r+dir][c+dc] && isWhite(board[r+dir][c+dc])!=white) moves.push([r+dir,c+dc]);
+  }
+  if(lower==='n'){ for(let [dr,dc] of [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]){ let nr=r+dr,nc=c+dc; if(inside(nr,nc) && (!board[nr][nc]||isWhite(board[nr][nc])!=white)) moves.push([nr,nc]) } }
+  if(lower==='b'||lower==='r'||lower==='q'){
+    let dirs=[]; if(lower==='b'||lower==='q') dirs.push(...[[1,1],[1,-1],[-1,1],[-1,-1]]); if(lower==='r'||lower==='q') dirs.push(...[[1,0],[-1,0],[0,1],[0,-1]]);
+    for(let [dr,dc] of dirs){ for(let i=1;i<8;i++){ let nr=r+dr*i,nc=c+dc*i; if(!inside(nr,nc)) break; if(!board[nr][nc]) moves.push([nr,nc]); else { if(isWhite(board[nr][nc])!=white) moves.push([nr,nc]); break; } } }
+  }
+  if(lower==='k'){ for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++){ if(dr==0&&dc==0) continue; let nr=r+dr,nc=c+dc; if(inside(nr,nc) && (!board[nr][nc]||isWhite(board[nr][nc])!=white)) moves.push([nr,nc]) } }
+  return moves.filter(m=>!leavesKingInCheck(r,c,m[0],m[1]));
+}
+
+function leavesKingInCheck(fr,fc,tr,tc){
+  let b=board.map(row=>[...row]); let p=b[fr][fc]; b[tr][tc]=p; b[fr][fc]='';
+  if(p.toLowerCase()==='p' && (tr==0||tr==7)) b[tr][tc]= isWhite(p)?'Q':'q';
+  return isInCheck(b, isWhite(p)?'w':'b');
+}
+
+function findKing(b,color){
+  let k=color=='w'?'K':'k'; for(let r=0;r<8;r++) for(let c=0;c<8;c++) if(b[r][c]==k) return [r,c]; return null;
+}
+function isInCheck(b,color){
+  let king=findKing(b,color); if(!king) return false;
+  let opp=color=='w'?'b':'w';
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){ let p=b[r][c]; if(!p) continue; if(opp=='w'&&!isWhite(p)||opp=='b'&&!isBlack(p)) continue;
+    let moves=getPseudoMoves(b,r,c); if(moves.some(m=>m[0]==king[0]&&m[1]==king[1])) return true;
+  } return false;
+}
+function getPseudoMoves(b,r,c){
+  let p=b[r][c]; let moves=[]; let white=isWhite(p); let dir=white?-1:1; let lower=p.toLowerCase();
+  if(lower==='p'){ for(let dc of [-1,1]){ let nr=r+dir,nc=c+dc; if(inside(nr,nc)) moves.push([nr,nc]) } if(inside(r+dir,c)) moves.push([r+dir,c]) }
+  if(lower==='n'){ for(let [dr,dc] of [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]) moves.push([r+dr,c+dc]) }
+  if(lower==='b'||lower==='r'||lower==='q'){
+    let dirs=[]; if(lower==='b'||lower==='q') dirs.push(...[[1,1],[1,-1],[-1,1],[-1,-1]]); if(lower==='r'||lower==='q') dirs.push(...[[1,0],[-1,0],[0,1],[0,-1]]);
+    for(let [dr,dc] of dirs) for(let i=1;i<8;i++){ let nr=r+dr*i,nc=c+dc*i; if(!inside(nr,nc)) break; moves.push([nr,nc]); if(b[nr][nc]) break; }
+  }
+  if(lower==='k'){ for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++) moves.push([r+dr,c+dc]) }
+  return moves.filter(m=>inside(m[0],m[1]));
+}
+
+function allLegalMoves(color){
+  let all=[]; for(let r=0;r<8;r++) for(let c=0;c<8;c++){ let p=board[r][c]; if(!p) continue; if(color=='w'&&!isWhite(p)||color=='b'&&!isBlack(p)) continue; let ms=getLegalMoves(r,c); for(let m of ms) all.push({fr:r,fc:c,tr:m[0],tc:m[1]}) } return all;
+}
+
+function evaluate(b){
+  let score=0; for(let r=0;r<8;r++) for(let c=0;c<8;c++){ let p=b[r][c]; if(!p) continue; let v=PIECES[p.toUpperCase()]||0; score+= isWhite(p)?v:-v; } return score;
+}
+
+function minimax(b,depth,alpha,beta,maximizing){
+  if(depth==0) return evaluate(b);
+  let color=maximizing?'w':'b';
+  let moves=allLegalMovesForBoard(b,color);
+  if(moves.length==0){ if(isInCheck(b,color)) return maximizing?-99999:99999; return 0; }
+  if(maximizing){ let max=-Infinity; for(let mv of moves){ let nb=doMove(b,mv); let val=minimax(nb,depth-1,alpha,beta,false); max=Math.max(max,val); alpha=Math.max(alpha,val); if(beta<=alpha) break; } return max; }
+  else { let min=Infinity; for(let mv of moves){ let nb=doMove(b,mv); let val=minimax(nb,depth-1,alpha,beta,true); min=Math.min(min,val); beta=Math.min(beta,val); if(beta<=alpha) break; } return min; }
+}
+function allLegalMovesForBoard(b,color){ let save=board; board=b; let m=allLegalMoves(color); board=save; return m; }
+function doMove(b,mv){ let nb=b.map(r=>[...r]); let p=nb[mv.fr][mv.fc]; nb[mv.tr][mv.tc]=p; nb[mv.fr][mv.fc]=''; if(p.toLowerCase()=='p' && (mv.tr==0||mv.tr==7)) nb[mv.tr][mv.tc]= isWhite(p)?'Q':'q'; return nb; }
+
+function botMove(){
+  if(gameOver) return;
+  let moves=allLegalMoves('b'); if(moves.length==0){ checkEnd(); return; }
+  moves.sort(()=>Math.random()-0.5);
+  let best=null, bestScore=Infinity;
+  for(let mv of moves){ let nb=doMove(board,mv); let score=minimax(nb,2,-Infinity,Infinity,true); if(score<bestScore){ bestScore=score; best=mv; } }
+  if(best){ makeMove(best.fr,best.fc,best.tr,best.tc); }
+}
+
+function makeMove(fr,fc,tr,tc){
+  board[tr][tc]=board[fr][fc]; board[fr][fc]=''; if(board[tr][tc].toLowerCase()=='p' && (tr==0||tr==7)) board[tr][tc]= isWhite(board[tr][tc])?'Q':'q';
+  lastMove=[fr,fc,tr,tc]; turn=turn=='w'?'b':'w'; drawBoard(); checkEnd();
+  if(turn=='b' && !gameOver){ document.getElementById('info').innerText="Bot soch raha hai..."; setTimeout(()=>{botMove(); document.getElementById('info').innerText="Tumhari chal"},300); }
+}
+
+function checkEnd(){
+  let moves=allLegalMoves(turn); if(moves.length==0){ gameOver=true; if(isInCheck(board,turn)){ document.getElementById('info').innerText= turn=='w'?"Checkmate! Bot jeet gaya":"Checkmate! Tum jeet gaye"; } else document.getElementById('info').innerText="Stalemate! Draw"; }
+}
+
+function drawBoard(){
+  let el=document.getElementById('board'); el.innerHTML='';
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    let div=document.createElement('div'); div.className='sq '+((r+c)%2==0?'light':'dark');
+    if(lastMove.length && ((r==lastMove[0]&&c==lastMove[1])||(r==lastMove[2]&&c==lastMove[3]))) div.classList.add('lastmove');
+    if(selected && selected[0]==r && selected[1]==c) div.classList.add('selected');
+    if(legalMoves.some(m=>m[0]==r&&m[1]==c)) div.classList.add('hint');
+    let p=board[r][c]; if(p){ div.innerText={K:'♔',Q:'♕',R:'♖',B:'♗',N:'♘',P:'♙',k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'}[p]||''; }
+    div.onclick=()=>onClick(r,c); el.appendChild(div);
+  }
+}
+function onClick(r,c){
+  if(gameOver||turn!='w') return;
+  let p=board[r][c];
+  if(selected){
+    if(legalMoves.some(m=>m[0]==r&&m[1]==c)){ makeMove(selected[0],selected[1],r,c); selected=null; legalMoves=[]; return; }
+    selected=null; legalMoves=[];
+  }
+  if(p && isWhite(p)){ selected=[r,c]; legalMoves=getLegalMoves(r,c); }
+  drawBoard();
+}
+function resetGame(){ board=initialBoard(); turn='w'; selected=null; legalMoves=[]; lastMove=[]; gameOver=false; document.getElementById('info').innerText="Tumhari chal"; drawBoard(); }
+resetGame();
+</script>
+</body>
+</html>
