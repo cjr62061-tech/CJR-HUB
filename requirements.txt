@@ -1,0 +1,31 @@
+# ====== CORE PYTHON ======
+python-dotenv>=1.0.0
+requests>=2.31.0
+openai>=1.0.0
+
+# ====== WEBSITE (FLASK SITE) ======
+Flask>=3.0.0
+Flask-Talisman>=1.1.0
+Flask-Limiter>=3.5.0
+gunicorn>=21.2.0
+Jinja2>=3.1.2
+
+# ====== SECURITY (Tera Guard) ======
+cryptography>=41.0.0
+bcrypt>=4.0.0
+PyJWT>=2.8.0
+python-dotenv>=1.0.0
+
+# ====== APK (KIVY APP) ======
+# Note: Ye Codespace me install nahi karna, sirf APK build ke time lagega
+kivy>=2.3.0
+kivymd>=1.2.0
+buildozer>=1.5.0
+
+# ====== GAME ======
+pygame>=2.5.0
+Pillow>=10.0.0
+
+# ====== DATABASE & UTILS ======
+SQLAlchemy>=2.0.0
+beautifulsoup4>=4.12.0
