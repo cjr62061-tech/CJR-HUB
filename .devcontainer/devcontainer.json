@@ -1,0 +1,28 @@
+{
+  "name": "Game Dev",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-toolsai.jupyter",
+        "ms-vscode.vscode-github-actions",
+        "GitHub.copilot",
+        "ms-python.black-formatter",
+        "formulahendry.code-runner",
+        "ms-vscode.vscode-serial-monitor",
+        "ms-python.pylint",
+        "tht13.python",
+        "albert.TabOut",
+        "ms-vscode.live-server"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "code-runner.runInTerminal": true
+      }
+    }
+  },
+  "postCreateCommand": "pip install pygame Pillow kivy requests"
+}
